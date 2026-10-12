@@ -12,34 +12,34 @@ export const urbanEstate: CaseStudy = {
     { label: "timeline", value: "1 month" },
   ],
   problem:
-    "Property search lives or dies by its filters. If they sit in component state, a search can't be shared, bookmarked or undone with Back. Listings only carry a free-text address, so showing them on a map means geocoding in the browser against a free service with a strict rate limit. And paging through results shouldn't blank the list every time.",
+    "Property search depends on its filters. If filters live in component state, a search can't be shared as a link, bookmarked, or undone with the Back button. Listings only store a free-text address, so to show them on a map the browser has to geocode each address (turn it into map coordinates) using a free service with a strict rate limit. And moving to the next page of results shouldn't blank the list each time.",
   approach:
-    "The URL is the only place search state lives: the filter form keeps a draft, writes the query string on submit, and re-reads it on Back and Forward. The list and the map read the same TanStack Query result, so pins always match the cards. Server data lives in TanStack Query, the logged-in user in a small persisted Zustand store, and errors go through one axios interceptor.",
+    "The URL is the only place search state lives. The filter form keeps a draft while you edit, writes it to the query string when you submit, and reads it back when you press Back or Forward. The list and the map both read the same TanStack Query result, so the map pins always match the cards. Server data lives in TanStack Query, the logged-in user lives in a small Zustand store saved in the browser, and all API errors are handled in one place, an axios interceptor.",
   architecture: [
     { label: "interface", items: ["React 19, React Router 7", "shadcn/ui and Tailwind", "⌘K command palette, dark mode"] },
     { label: "state", items: ["Filters and page in the URL", "TanStack Query for server data", "Zustand for the session"] },
-    { label: "map", items: ["Leaflet with OpenStreetMap tiles", "Nominatim geocoding, queued and cached"] },
+    { label: "map", items: ["Leaflet with OpenStreetMap tiles", "Nominatim geocoding (address to coordinates), queued and cached"] },
     { label: "forms", items: ["react-hook-form and Zod", "FilePond image uploads"] },
-    { label: "api", items: ["Axios with cookie auth", "One interceptor for errors and 401s"] },
+    { label: "api", items: ["Axios with cookie auth", "One interceptor handles errors and 401s (not logged in)"] },
     { label: "roles", items: ["Tenants search and apply", "Landlords list and edit properties"] },
   ],
   hardProblems: [
     {
       title: "Searches you can share and undo",
-      problem: "Filters kept in component state vanish on reload and can't be linked or undone with Back.",
-      fix: "Every filter and the page number live in the URL. The form keeps a local draft that re-syncs on every URL change, and a new search drops back to page 1.",
+      problem: "Filters kept in component state are lost on reload, and can't be shared as a link or undone with Back.",
+      fix: "Every filter and the page number live in the URL. The form keeps a local draft and refreshes it from the URL whenever the URL changes, and starting a new search resets to page 1.",
     },
     {
       title: "Geocoding without getting rate-limited",
-      problem: "Listings carry free-text addresses, and Nominatim allows about one request a second.",
-      fix: 'A promise queue spaces requests 1.1 seconds apart. If two cards have the same address, only one request goes out. Answers are cached in `localStorage`, including "not found", so a bad address isn\'t retried on every visit. If you change the search before a lookup finishes, its result is ignored.',
+      problem: "Listings only have free-text addresses, and Nominatim allows about one request per second.",
+      fix: 'A promise queue sends lookups one at a time, 1.1 seconds apart. If two cards have the same address, only one request goes out. Results are cached in `localStorage`, including "not found", so a bad address isn\'t looked up again on every visit. If you change the search before a lookup finishes, its result is thrown away.',
       tradeOff:
-        "Each visitor still geocodes in their own browser. The better fix is geocoding once on the server when a listing is saved and storing the coordinates. I kept it in the browser because the API wasn't mine to change.",
+        "Every visitor still geocodes in their own browser. The better fix is to geocode once on the server when a listing is saved and store the coordinates with it. I kept it in the browser because I didn't own the API and couldn't change it.",
     },
     {
       title: "A list that never flashes empty",
-      problem: "Each new page would blank the grid while it loads.",
-      fix: "`placeholderData: keepPreviousData` keeps the old page on screen, faded, until the new one arrives. Pins and cards come from the same query, so they swap together.",
+      problem: "Loading a new page would clear the grid until the data arrived.",
+      fix: "`placeholderData: keepPreviousData` (a TanStack Query option) keeps the old page on screen, faded, until the new one arrives. Pins and cards come from the same query, so they update together.",
     },
   ],
   screens: [
@@ -77,5 +77,5 @@ export const urbanEstate: CaseStudy = {
     },
   ],
   outcome:
-    "Live on Vercel with a one-click demo login for reviewers. Tenants can search, see results on a map, open a property and apply. Landlords can create and edit listings with photos. Any search can be copied as a link and opens the same results, and repeat visits load map pins from cache instantly. Built while learning frontend; the first UI was rough, and I reworked it as I learned. With more time: move geocoding to the server and add tests for the URL and filter sync.",
+    "Live on Vercel with a one-click demo login for reviewers. Tenants can search, see results on a map, open a property and apply. Landlords can create and edit listings with photos. Any search can be copied as a link and opens the same results, and on repeat visits map pins load instantly from the cache. Built while learning frontend; the first UI was rough, and I reworked it as I learned. With more time: move geocoding to the server and add tests that check the URL and the filter form stay in sync.",
 };
