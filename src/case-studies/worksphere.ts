@@ -12,9 +12,9 @@ export const worksphere: CaseStudy = {
     { label: "timeline", value: "1 week" },
   ],
   problem:
-    "Three roles look at the same people with different rights. If those rights live only in the UI, anyone with devtools can promote themselves. And an org chart is only as good as its data: one broken manager link and the whole tree fails to render. The task was to build an employee management system as a hiring assignment, in one week.",
+    "Three roles (super admin, HR manager and employee) see the same employee records, but each role is allowed to do different things. If those permission checks live only in the frontend, anyone can open the browser's developer tools, call the API directly and give themselves a higher role. The org chart has a similar weak spot: it is built from each employee's manager link, so one broken link can stop the whole tree from rendering. The task was a hiring assignment: build an employee management system in one week.",
   approach:
-    "Two services in one TypeScript monorepo. An Express 5 API owns every rule; a Next.js frontend renders only what the API allows. Every write is checked again on the server: the caller's role, which fields that role may edit, and whether the record still follows the reporting rules after the change. Shared packages hold the UI primitives and typed environment variables.",
+    "Two apps in one TypeScript monorepo. An Express 5 API enforces every rule, and a Next.js frontend only shows what the API allows. The API checks every change again on its own: who is making it, which fields their role may edit, and whether the record still follows the reporting rules after the change. Shared packages hold the UI components and the typed environment variables both apps use.",
   architecture: [
     {
       label: "interface",
@@ -29,41 +29,42 @@ export const worksphere: CaseStudy = {
       items: [
         "One HR manager per department, reporting to the super admin",
         "Employees report to their department's HR manager, or the super admin when there is none",
-        "Every save checks the final record against these rules, so changing only a role or department can't sneak past them",
+        "Every save checks the record as it will look after the change, so editing only the role or only the department can't break these rules",
       ],
     },
     {
       label: "data",
-      items: ["MongoDB and Mongoose", "Dashboard stats in one `$facet` aggregation", "Atomic counter for employee IDs", "Soft delete"],
+      items: ["MongoDB and Mongoose", "Dashboard stats from one `$facet` aggregation (several counts in a single query)", "Atomic counter for employee IDs", "Soft delete (records are marked deleted, not removed)"],
     },
     { label: "auth", items: ["JWT in `httpOnly` cookies, bcrypt", "Forced password change for accounts with temporary passwords"] },
-    { label: "deploy", items: ["Vercel (web), Render (API), MongoDB Atlas", "Env vars validated at boot with Zod"] },
+    { label: "deploy", items: ["Vercel (web), Render (API), MongoDB Atlas", "Env vars checked with Zod when the server starts"] },
   ],
   hardProblems: [
     {
       title: "Employee IDs that don't collide",
-      problem: "\"Highest ID plus one\" sorts as text, so it breaks at EMP-10000, and two requests at once can get the same ID.",
-      fix: "An atomic counter document (`findOneAndUpdate` with `$inc`), plus a one-time backfill for existing records.",
+      problem:
+        "New IDs were made by taking the highest existing ID and adding one. IDs are stored as text, so sorting puts \"EMP-10000\" before \"EMP-9999\", and once we pass 9999 the \"highest\" ID is wrong. Also, if two employees are created at the same moment, both requests can read the same highest ID and save the same new ID.",
+      fix: "A single counter document in MongoDB. Each new employee increases it by one in one atomic step (`findOneAndUpdate` with `$inc`), so no two requests can ever get the same number. A one-time backfill script handled employees who already existed.",
     },
     {
       title: "Logged in across two domains",
-      problem: "The frontend is on Vercel and the API on Render, so the browser won't send the session cookie cross-site.",
-      fix: "The Next.js server reads its own `httpOnly` cookie and forwards it as a header on API calls, server to server.",
+      problem: "The frontend runs on Vercel and the API on Render, on different domains. Browsers block cookies on requests to another site, so the login cookie never reached the API.",
+      fix: "The login cookie is set on the frontend's own domain (`httpOnly`, so page scripts can't read it). API calls go through the Next.js server, which reads the cookie and passes it to the API in a request header. That hop is server to server, so browser cookie rules don't apply.",
     },
     {
       title: "An org chart that survives bad data",
-      problem: "A deleted manager left dangling `reportingManager` references, and one bad record crashed the whole chart.",
-      fix: "Orphaned records fall back to the real root. Deleting a manager reassigns their reports to the super admin, and the super admin can't be deleted.",
+      problem: "Each employee stores their manager's ID in `reportingManager`. When a manager was deleted, their reports still pointed to an ID that no longer existed, and that one broken record crashed the whole chart.",
+      fix: "If the chart finds an employee whose manager doesn't exist, it attaches them to the super admin at the top of the tree. Deleting a manager now moves their reports to the super admin, and the super admin account can't be deleted.",
     },
     {
       title: "Express 5 made `req.query` read-only",
-      problem: "Validation middleware that rewrote `req.query` with parsed values started throwing.",
-      fix: "Validated query data goes through `res.locals`, so the middleware stays reusable.",
+      problem: "In Express 5, `req.query` can no longer be overwritten. Our validation middleware parsed the query string with Zod and wrote the cleaned values back to `req.query`, so it started throwing errors.",
+      fix: "The middleware now puts the validated values in `res.locals`, and route handlers read them from there. The same middleware still works on every route.",
     },
     {
       title: "An org chart that can't loop",
-      problem: "If A reports to B and B reports to A, the tree never ends and the chart can't render.",
-      fix: "The rules allow only three levels: super admin at the top, HR managers under them, employees under HR managers, and employees can never manage anyone. With those rules a loop can't form. A cycle check on every manager change stays as a second guard.",
+      problem: "If A reports to B and B reports to A, following manager links never reaches the top, so the chart can't be drawn.",
+      fix: "The rules allow only three levels: the super admin at the top, HR managers below them, and employees below HR managers. Employees can never manage anyone, so a loop can't form. The API still checks for loops on every manager change, as a second safety net.",
     },
   ],
   screens: [
@@ -101,5 +102,5 @@ export const worksphere: CaseStudy = {
     },
   ],
   outcome:
-    "Delivered in the one week given. Three roles, 60 employees across 7 departments, live on Vercel, Render and MongoDB Atlas, with a one-click demo login for each role. Bugs found after deploying (ID collisions, the org chart crash, updates that failed silently) were traced from logs and the network tab and fixed. With more time: a unique index so two people can't become HR manager of the same department at once.",
+    "Delivered within the one week. Three roles, 60 employees across 7 departments, live on Vercel, Render and MongoDB Atlas, with a one-click demo login for each role. Bugs found after deploying (ID collisions, the org chart crash, updates that failed without showing an error) were traced through server logs and the browser's network tab, then fixed. With more time: a unique index in the database, so two people can't be made HR manager of the same department at the same moment.",
 };
