@@ -12,9 +12,9 @@ export const philkart: CaseStudy = {
     { label: "timeline", value: "4 days" },
   ],
   problem:
-    "A catalog that keeps growing while people browse it. The app can add hundreds of thousands of products in the background, and with plain skip-and-limit paging every insert shifts the list: you see the same product twice or miss one. The app also needs to create hundreds of thousands of products on demand, without making other requests wait. The task was a hiring assignment, due in four days.",
+    "A product catalog that keeps growing while people browse it. The app can add hundreds of thousands of products in the background. With plain skip-and-limit paging, page 3 means \"skip the first 40 rows and take the next 20\", so every new product shifts the rows and you see the same product twice or miss one. Creating that many products on demand also must not make other requests wait. The task was a hiring assignment, due in four days.",
   approach:
-    "A Turborepo monorepo scaffolded with Better-T-Stack, so the time went into the app rather than the wiring. An Express 5 API does the heavy work on a real Node server; a Next.js frontend browses it. Products are paged by cursor over a stable `(sort field, _id)` order backed by compound indexes, and the server can insert products two ways, batched on the main thread or split across worker threads, so the trade-offs of heavy work in Node can be compared.",
+    "A Turborepo monorepo set up with Better-T-Stack, so the time went into the app instead of project setup. An Express 5 API does the heavy work on a regular Node server, not serverless functions, and a Next.js frontend browses it. Products are paged by cursor: each page asks for the products that come after the last one shown, in a fixed `(sort field, _id)` order. `_id` breaks ties when two products share a price or name, and compound indexes on those fields keep each query fast. The server can insert products two ways, in batches on the main thread or split across worker threads, so the two approaches can be compared.",
   architecture: [
     {
       label: "interface",
@@ -30,7 +30,7 @@ export const philkart: CaseStudy = {
       label: "data",
       items: [
         "Mongoose 9",
-        "Six compound indexes, one per sort order with and without category, so every filter and sort is an index scan",
+        "Six compound indexes, one per sort order with and without category, so every query reads from an index instead of scanning the whole collection",
         "Faker seeding",
       ],
     },
@@ -48,25 +48,25 @@ export const philkart: CaseStudy = {
   hardProblems: [
     {
       title: "Pages that don't shift while products are added",
-      problem: "Skip and limit count rows from the top, so a batch insert makes the next page repeat or skip items.",
-      fix: "Next and previous use cursor pagination on `(sort field, _id)`, so a new insert can't push items between pages. The page number in the UI comes from counting how many products sort before the first one on screen.",
+      problem: "Skip and limit count rows from the top. If products are inserted between two page loads, the rows shift, so the next page repeats items from the last one or skips some.",
+      fix: "Next and previous use cursor pagination: the request says \"give me the products after this one\" using its `(sort field, _id)` values, so new inserts can't push items across pages. The page number shown in the UI is worked out by counting how many products sort before the first one on screen.",
     },
     {
       title: "Landing on the right page after a big insert",
-      problem: "Generating products while browsing leaves you on a page that now shows different items.",
-      fix: "The app remembers the first product you were looking at. After an insert, the server finds which page that product is on now and loads that page. This is the one place that uses `skip`, since it has to land on an exact page number.",
+      problem: "If you generate products while browsing, the page number you were on now holds different items.",
+      fix: "The app remembers the first product on your screen. After an insert, the server works out which page that product is on now and loads that page. This is the only place that uses `skip`, because it has to jump to an exact page number.",
     },
     {
       title: "300k products without freezing the server",
-      problem: "One big insert loop blocks Node's event loop, so every other request waits.",
-      fix: "Two ways side by side. Batched `insertMany` awaits each batch of 1,000, so other requests get a turn between batches. Worker threads split the job across 4 threads, each with its own database connection, so the main thread only waits for them to finish.",
+      problem: "Node runs JavaScript on one thread. One big insert loop keeps that thread busy (it blocks the event loop), so every other request waits until the loop ends.",
+      fix: "Two approaches, built side by side. Batched `insertMany` saves 1,000 products at a time and waits for each batch, which gives other requests a turn between batches. Worker threads split the job across 4 separate threads, each with its own database connection, so the main thread stays free while it waits for them to finish.",
     },
     {
       title: "Page numbers aren't free",
       problem:
-        'To show "page 7 of 3,903", the server counts rows on every request. Counting deep into 500k products gets slow, close to the cost skip had.',
+        'To show "page 7 of 3,903", the server counts matching products on every request. Counting deep into 500k products gets slow, almost as slow as `skip` was.',
       tradeOff:
-        'Cursors fixed duplicates and gaps, but not the cost of knowing which page you\'re on. I kept page numbers because the assignment asked for them. A real store would likely switch to "load more" and drop exact page numbers.',
+        'Cursors fixed the duplicates and gaps, but not the cost of knowing which page you\'re on. I kept page numbers because the assignment asked for them. A real store would likely use a "load more" button and drop exact page numbers.',
     },
   ],
   screens: [
@@ -104,5 +104,5 @@ export const philkart: CaseStudy = {
     },
   ],
   outcome:
-    "Submitted in the four days given. Live on Vercel, Render and MongoDB Atlas, browsing more than 500,000 generated products with six sort orders, a category filter and 20 to 100 items per page. With more time: cache the counts instead of running them on every request, cap and protect the generate endpoints, and add tests that walk every page while products are being inserted to prove nothing repeats or goes missing.",
+    "Submitted within the four days. Live on Vercel, Render and MongoDB Atlas, with more than 500,000 generated products to browse, six sort orders, a category filter and 20 to 100 items per page. With more time: cache the counts instead of running them on every request, limit how much the generate endpoints can create and protect them from abuse, and add tests that page through the whole catalog while products are being inserted, to prove nothing repeats or goes missing.",
 };
