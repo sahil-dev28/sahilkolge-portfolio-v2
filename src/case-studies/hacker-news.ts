@@ -11,34 +11,34 @@ export const hackerNews: CaseStudy = {
     { label: "context", value: "Personal project" },
   ],
   problem:
-    "Hacker News has years of stories but no way to browse them by popularity within a time window. Algolia's HN API can, but only if the client keeps sort, search, date range and page in step: change one and the others must follow, or you end up asking for page 40 of a search with three results.",
+    "Hacker News has years of stories but no way to browse the most popular ones from a given time period, like last week. Algolia's HN API supports this, but the client has to keep sort, search, date range and page in step. Change one and the others must update too, or you end up asking for page 40 of a search that has three results.",
   approach:
-    "Every control writes to one Zustand store, and every action that changes what you're looking at also resets the page. TanStack Query keys on the whole set (sort, search, page, page size and date window), so each combination caches on its own. The search box is debounced, so typing doesn't fire a request per key.",
+    "Every control writes to one Zustand store, and every action that changes what you're looking at also resets the page to the first one. The TanStack Query key includes every setting (sort, search, page, page size and date window), so each combination is cached separately. The search box is debounced: it waits until you stop typing, so it doesn't send a request on every key press.",
   architecture: [
     { label: "interface", items: ["React 19 and Vite", "Tailwind", "react-day-picker for custom ranges, react-paginate"] },
     { label: "state", items: ["Zustand for sort, search, page and date window", "TanStack Query for results"] },
-    { label: "api", items: ["HN Algolia `search` and `search_by_date`", "Numeric filters on `created_at_i`"] },
+    { label: "api", items: ["HN Algolia `search` and `search_by_date`", "Numeric filters on `created_at_i` (the story's Unix timestamp)"] },
   ],
   hardProblems: [
     {
       title: "Never landing on an empty page",
-      problem: "On page 12, a new search with five results would ask Algolia for a page that doesn't exist.",
-      fix: "Every store action that changes sort, search, page size or date window sets the page back to zero, and the pager is forced to match.",
+      problem: "If you're on page 12 and start a new search with five results, the app would ask Algolia for page 12, which doesn't exist.",
+      fix: "Every store action that changes sort, search, page size or date window resets the page to the first one (page 0 in Algolia), and the pager is updated to match.",
     },
     {
       title: "One cache entry per view",
-      problem: "Sort, search, page and date window all change the request, and a key that misses one serves the wrong results.",
-      fix: "One query key with every parameter, so each view caches separately and going back to a page or search you just saw comes from cache.",
+      problem: "Sort, search, page and date window all change what the API returns. If the cache key leaves one of them out, the app shows cached results from a different view.",
+      fix: "The query key includes every parameter, so each view is cached separately, and going back to a page or search you just saw loads from the cache.",
     },
     {
       title: "Search without a request per keystroke",
-      problem: "Typing a query would fire a request on every key.",
-      fix: "A small debounce I wrote myself waits until you stop typing, and cancels the pending call if the component unmounts, so a late request can't update a screen that's gone.",
+      problem: "Without a delay, typing a query would send a request on every key press.",
+      fix: "A small debounce function I wrote waits until you stop typing before sending the request. It also cancels the pending call if the component unmounts (leaves the screen), so a late request can't update a screen that's gone.",
     },
     {
       title: "Time windows the API understands",
-      problem: "Algolia filters by Unix timestamp, while people think in \"last week\" or a calendar range.",
-      fix: "Last 24 hours, week, month and year, or a custom calendar range with future dates disabled, are all turned into `created_at_i` numeric filters.",
+      problem: "Algolia filters by Unix timestamp (seconds since 1970), but people think in \"last week\" or a calendar range.",
+      fix: "The presets (last 24 hours, week, month and year) and the custom calendar range, which blocks future dates, are all converted into numeric filters on `created_at_i`.",
     },
   ],
   screens: [
@@ -76,5 +76,5 @@ export const hackerNews: CaseStudy = {
     },
   ],
   outcome:
-    "Live on Vercel. Browse Hacker News by popularity or date, for the last day, week, month, year or any custom range, with search and paging that stay in sync. This was one of my earlier projects. In Urban Estate I went further and moved all search state into the URL, so a search survives a refresh and can be shared.",
+    "Live on Vercel. Browse Hacker News by popularity or date, for the last day, week, month, year or any custom range, with search and paging that stay in sync. This was one of my earlier projects. In Urban Estate I went further and moved all search state into the URL, so a search survives a refresh and can be shared as a link.",
 };
