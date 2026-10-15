@@ -11,7 +11,7 @@ export const hackerNews: CaseStudy = {
     { label: "context", value: "Personal project" },
   ],
   problem:
-    "Hacker News has years of stories but no way to browse the most popular ones from a given time period, like last week. Algolia's HN API supports this, but the client has to keep sort, search, date range and page in step. Change one and the others must update too, or you end up asking for page 40 of a search that has three results.",
+    "Hacker News has years of stories, but its own site has no way to browse the most popular ones from a given time period, like last week. I rebuilt this kind of search on Algolia's public HN API to learn what it takes: the client has to keep sort, search, date range and page in step. Change one and the others must update too, or you end up asking for page 40 of a search that has three results.",
   approach:
     "Every control writes to one Zustand store, and every action that changes what you're looking at also resets the page to the first one. The TanStack Query key includes every setting (sort, search, page, page size and date window), so each combination is cached separately. The search box is debounced: it waits until you stop typing, so it doesn't send a request on every key press.",
   architecture: [
@@ -23,7 +23,7 @@ export const hackerNews: CaseStudy = {
     {
       title: "Never landing on an empty page",
       problem: "If you're on page 12 and start a new search with five results, the app would ask Algolia for page 12, which doesn't exist.",
-      fix: "Every store action that changes sort, search, page size or date window resets the page to the first one (page 0 in Algolia), and the pager is updated to match.",
+      fix: "Every store action that changes sort, search or date window resets the page to the first one (page 0 in Algolia), and the pager is updated to match.",
     },
     {
       title: "One cache entry per view",
@@ -76,5 +76,5 @@ export const hackerNews: CaseStudy = {
     },
   ],
   outcome:
-    "Live on Vercel. Browse Hacker News by popularity or date, for the last day, week, month, year or any custom range, with search and paging that stay in sync. This was one of my earlier projects. In Urban Estate I went further and moved all search state into the URL, so a search survives a refresh and can be shared as a link.",
+    "Live on Vercel. Browse Hacker News by popularity or date, for the last day, week, month, year or any custom range, with search and paging that stay in sync. This was one of my earlier projects. In Urban Estate I went further and moved all search state into the URL, so a search survives a refresh and can be shared as a link. Looking back, there's one thing I'd improve: the custom range calendar closes after the first date, so you reopen it to pick the end date. Keeping it open until both dates are picked would make it smoother.",
 };
